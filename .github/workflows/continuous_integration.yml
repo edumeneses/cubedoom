@@ -45,6 +45,23 @@ jobs:
       uses: proudust/gh-describe@v2
       continue-on-error: true
 
+    # NDI SDK headers so the fulldome NDI output path (-DHAVE_NDI=1) is
+    # compile-tested. Headers only; runtime is dlopen'd. Non-fatal.
+    - name: Install NDI SDK headers
+      continue-on-error: true
+      shell: bash
+      run: |
+        wget -q https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz
+        tar -xf Install_NDI_SDK_v6_Linux.tar.gz
+        sh ./Install_NDI_SDK_v6_Linux.sh --noexec --target "$HOME/ndisdk"
+        hdr="$(find "$HOME/ndisdk" -name 'Processing.NDI.Lib.h' -print -quit)"
+        if [ -n "$hdr" ]; then
+          echo "NDI_SDK_DIR=$(dirname "$(dirname "$hdr")")" >> "$GITHUB_ENV"
+          echo "Found NDI header: $hdr"
+        else
+          echo "::warning::NDI SDK header not found — NDI output disabled"
+        fi
+
     - name: Configure
       shell: bash
       run: |

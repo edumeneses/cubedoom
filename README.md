@@ -41,6 +41,13 @@ or in a startup config file.
 | `r_cubemap_ndi_label` | `"CubeDoom"` | NDI source name |
 | `r_cubemap_debug` | `false` | Debug logging |
 
+All of the above are also exposed in-game under **Options → Fulldome Output**.
+
+NDI is compiled in when the NDI SDK headers are present at build time (CI
+installs them); the `libndi.so.6` runtime is loaded via `dlopen` at first use,
+so the host running the AppImage must have the NDI 6 runtime installed
+(https://ndi.video/download-ndi-sdk/ or the NDI Tools/Redist package).
+
 ### SpatGRIS spatial audio
 
 CubeDoom sends per-source 3D positions to [SpatGRIS](https://github.com/GRIS-UdeM/SpatGRIS)

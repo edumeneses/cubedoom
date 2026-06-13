@@ -52,6 +52,29 @@ jobs:
             file \
             librsvg2-bin
 
+      # NDI SDK headers (build-time only). The runtime libndi.so.6 is loaded
+      # via dlopen at first use, so the AppImage carries no link-time NDI
+      # dependency — end users still need the NDI 6 runtime installed. We only
+      # need the headers here so the build defines -DHAVE_NDI=1. The installer
+      # is a makeself archive: --noexec --target extracts it without the
+      # interactive EULA prompt. Non-fatal: if the mirror is down the build
+      # still succeeds with NDI output disabled.
+      - name: Install NDI SDK headers
+        continue-on-error: true
+        run: |
+          wget -q https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz
+          tar -xf Install_NDI_SDK_v6_Linux.tar.gz
+          sh ./Install_NDI_SDK_v6_Linux.sh --noexec --target "$HOME/ndisdk"
+          # Locate the header (layout varies across SDK versions) and point
+          # cmake's find_path at its include dir's parent via NDI_SDK_DIR.
+          hdr="$(find "$HOME/ndisdk" -name 'Processing.NDI.Lib.h' -print -quit)"
+          if [ -n "$hdr" ]; then
+            echo "NDI_SDK_DIR=$(dirname "$(dirname "$hdr")")" >> "$GITHUB_ENV"
+            echo "Found NDI header: $hdr"
+          else
+            echo "::warning::NDI SDK header not found — NDI output will be disabled"
+          fi
+
       - name: Configure
         run: |
           cmake -B build -G Ninja \
@@ -180,6 +203,10 @@ jobs:
             ### Fulldome output
             Enable cubemap rendering: Options -> Fulldome Output
 
+            NDI output additionally needs the NDI 6 runtime on the host
+            (`libndi.so.6`): https://ndi.video/download-ndi-sdk/ or the
+            NDI Tools/Redist package.
+
       # ── Rolling release ───────────────────────────────────────────────────
       # Every push to master refreshes a single "continuous" prerelease that
       # always carries the newest AppImage under a stable filename.
@@ -216,3 +243,7 @@ jobs:
 
             ### Fulldome output
             Enable cubemap rendering: Options -> Fulldome Output
+
+            NDI output additionally needs the NDI 6 runtime on the host
+            (`libndi.so.6`): https://ndi.video/download-ndi-sdk/ or the
+            NDI Tools/Redist package.
