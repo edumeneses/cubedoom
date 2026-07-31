@@ -148,6 +148,12 @@ struct DomemasterParams
 	float hudBand      = 0.16f; // radial thickness as a fraction of the dome radius
 	float hudStrip     = 0.20f; // bottom fraction of hudTex treated as the status bar
 	float hudOffsetDeg = 0.f;   // manual rotation of the band around the rim
+	// Rim-band azimuth. By default the band auto-centres under the forward view,
+	// derived in-shader from invRot — so with the heading lock on it orbits the
+	// rim with the weapon. Set hudCenterFixed with a hudCenterRad computed from
+	// the UNSPUN rotation to pin the band to the dome front instead.
+	bool  hudCenterFixed = false;
+	float hudCenterRad   = 0.f;
 	float hudCrop      = 0.f;   // crop each side of the band (0..0.49)
 	bool  hudFlipH     = false; // mirror the HUD band horizontally
 	bool  hudFlipV     = false; // mirror the HUD band vertically

@@ -367,6 +367,7 @@ uniform float uHudEnable;   // >0.5 = composite rim HUD
 uniform vec4  uHudParams;   // x=halfArcRad y=band z=strip w=crop(each side)
 uniform float uHudOffset;   // radians added to the auto front-azimuth
 uniform vec2  uHudFlip;     // x=flipH(1/0) y=flipV(1/0)
+uniform vec2  uHudCenter;   // x=fixed rim azimuth (rad) y=use it(1/0)
 #define UV(c) (((c) * vec2(1.0, 1.0) + 1.0) * 0.5)
 void main() {
     vec2 p = (vUV * 2.0 - 1.0) * uFlip;
@@ -414,7 +415,8 @@ void main() {
             }
         } else {
             vec3 fwd = vec3(uInvRot[0][2], uInvRot[1][2], uInvRot[2][2]);
-            float center = atan(fwd.y, fwd.x) + uHudOffset;
+            float center = (uHudCenter.y > 0.5 ? uHudCenter.x : atan(fwd.y, fwd.x))
+                         + uHudOffset;
             float ang = atan(p.y, p.x);
             float dd  = mod(ang - center + 3.14159265, 6.28318531) - 3.14159265;
             if (r >= 1.0 - band && abs(dd) <= halfArc) {
@@ -452,7 +454,7 @@ void OpenGLFrameBuffer::RenderDomemaster(FCanvasTexture** faces, int N,
                                          const DomemasterParams& params)
 {
 	static GLuint sFBO = 0, sProg = 0, sVAO = 0;
-	static GLint  uInvRot = -1, uHalfFov = -1, uEquirect = -1, uFlip = -1, uFlipUD = -1, uHudEnable = -1, uHudParams = -1, uHudOffset = -1, uHudFlip = -1;
+	static GLint  uInvRot = -1, uHalfFov = -1, uEquirect = -1, uFlip = -1, uFlipUD = -1, uHudEnable = -1, uHudParams = -1, uHudOffset = -1, uHudFlip = -1, uHudCenter = -1;
 	if (!sFBO)
 	{
 		glGenFramebuffers(1, &sFBO);
@@ -482,6 +484,7 @@ void OpenGLFrameBuffer::RenderDomemaster(FCanvasTexture** faces, int N,
 		uHudParams = glGetUniformLocation(sProg, "uHudParams");
 		uHudOffset = glGetUniformLocation(sProg, "uHudOffset");
 		uHudFlip   = glGetUniformLocation(sProg, "uHudFlip");
+		uHudCenter = glGetUniformLocation(sProg, "uHudCenter");
 		glUseProgram(0);
 	}
 
@@ -580,6 +583,7 @@ void OpenGLFrameBuffer::RenderDomemaster(FCanvasTexture** faces, int N,
 	            params.hudBand, params.hudStrip, params.hudCrop);
 	glUniform1f(uHudOffset, params.hudOffsetDeg * (3.14159265359f / 180.0f));
 	glUniform2f(uHudFlip, params.hudFlipH ? 1.0f : 0.0f, params.hudFlipV ? 1.0f : 0.0f);
+	glUniform2f(uHudCenter, params.hudCenterRad, params.hudCenterFixed ? 1.0f : 0.0f);
 
 	glBindVertexArray(sVAO);
 	glDrawArrays(GL_TRIANGLES, 0, 3);

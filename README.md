@@ -69,7 +69,8 @@ equirectangular warp (`r_cubemap_mode 2`), which has its own rotation:
 | `r_cubemap_dome_flip_v` | `false` | Flip output vertically |
 | `r_cubemap_dome_flip_ud` | `false` | Swap ceiling/floor |
 | `r_cubemap_dome_swap_ud` | `true` | Swap up/down faces |
-| `r_cubemap_dome_lock_yaw` | `false` | Lock the scene to a fixed dome heading. The domemaster output is counter-rotated by the player's yaw change (latched on enable), so the projected world stays still while the weapon orbits around the dome to show the player's aim. Domemaster and equirect. |
+| `r_cubemap_dome_lock_yaw` | `false` | Lock the scene to a fixed dome heading. The output is spun about the vertical axis by the player's yaw change (latched on enable), so the projected world stays still while the weapon orbits around the dome to show the player's aim. Domemaster and equirect. |
+| `r_cubemap_dome_hud_lock` | `true` | With the heading lock on, keep the rim HUD band at the dome front (fixed for the audience) instead of letting it orbit the rim with the weapon. Domemaster only. |
 
 ### HUD — status bar & menu
 

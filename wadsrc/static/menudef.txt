@@ -440,6 +440,7 @@ OptionMenu "FulldomeOutputOptions" protected
 	Option    "Swap ceiling/floor", "r_cubemap_dome_flip_ud", "OnOff"
 	Option    "Swap up/down faces", "r_cubemap_dome_swap_ud", "OnOff"
 	Option    "Lock dome heading (player moves, world fixed)", "r_cubemap_dome_lock_yaw", "OnOff"
+	Option    "  HUD band fixed at dome front (else follows gun)", "r_cubemap_dome_hud_lock", "OnOff"
 
 	StaticText " "
 	StaticText "Equirectangular", 1

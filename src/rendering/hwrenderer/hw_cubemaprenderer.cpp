@@ -49,6 +49,10 @@ CVAR(Bool,   r_cubemap_dome_swap_ud,    true,           CVAR_ARCHIVE | CVAR_GLOB
 CVAR(Bool,   r_cubemap_dome_lock_yaw,    false,          CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 // Rim HUD (domemaster only): status bar drawn as a band along the front rim.
 CVAR(Bool,   r_cubemap_dome_hud,        true,           CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+// Where the rim band sits while the heading lock is on: true keeps it at the
+// dome front (0 degrees, fixed for the audience), false lets it orbit the rim
+// with the weapon. No effect with the lock off — the band is at the front then.
+CVAR(Bool,   r_cubemap_dome_hud_lock,   true,           CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float,  r_cubemap_dome_hud_arc,    45.f,           CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float,  r_cubemap_dome_hud_band,   0.035f,         CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float,  r_cubemap_dome_hud_strip,  0.035f,         CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
@@ -246,6 +250,41 @@ static void BuildInvRot(float yawDeg, float pitchDeg, float rollDeg, bool flipPo
 	if (flipPolar)
 	{
 		out[6] = -out[6];  out[7] = -out[7];  out[8] = -out[8];
+	}
+}
+
+// Spin the projected content about the capture frame's VERTICAL axis, by
+// degrees of engine yaw. Used by the heading lock (see CompositeAndStream).
+//
+// The 6 faces are captured in the player's frame: cube +X = right, +Z = the
+// player's forward, up = -Y (the shader's face selection and the swap_ud
+// default follow from that). Turning the player by d rotates every world
+// direction's cube coordinates by Ry(d) — a world feature dead ahead ends up
+// at +X after a 90 degree left turn. Left-multiplying the inverse content
+// rotation by that same Ry(d) makes the output follow the turn, which is what
+// pins the world to the dome while the player moves across it.
+//
+// This can NOT be done through the yaw/pitch/roll Euler slots: yaw is the
+// first rotation of the ZXZ chain, so it turns the content about cube +Z (the
+// player's forward). With the dome's pitch at 90 (dome centre = engine up)
+// folding the offset into yaw swung the whole projection axis off the zenith
+// instead of spinning the image about it — the room sheared and the weapon
+// spiralled in toward the centre instead of riding the rim.
+//
+// m is column-major (m[col*3+row]), so left multiplication transforms each
+// column independently.
+static void SpinContentAboutUp(float deg, float m[9])
+{
+	if (deg == 0.f) return;
+
+	const float d2r = 3.14159265359f / 180.0f;
+	const float c = cosf(deg * d2r), s = sinf(deg * d2r);
+
+	for (int col = 0; col < 3; col++)
+	{
+		const float x = m[col * 3 + 0], z = m[col * 3 + 2];
+		m[col * 3 + 0] =  c * x + s * z;
+		m[col * 3 + 2] = -s * x + c * z;
 	}
 }
 
@@ -612,11 +651,12 @@ void CubemapRenderer::CompositeAndStream()
 
 	const int mode = OutputMode();
 
-	// Yaw lock (dome + equirect): counter-rotate the output by the player's
-	// yaw change since the reference. The scene is captured in the player's
-	// frame, so adding the player yaw to the warp yaw cancels the scene's
-	// rotation (world stays fixed on the output) while orbiting the
-	// front-face weapon to the aim direction. See mDomeLock* in the header.
+	// Yaw lock (dome + equirect): spin the output about the vertical axis by the
+	// player's yaw change since the reference. The scene is captured in the
+	// player's frame, so following that yaw cancels the scene's rotation (world
+	// stays fixed on the output) while orbiting the front-face weapon to the aim
+	// direction. Applied with SpinContentAboutUp, NOT through the yaw Euler slot
+	// (which rotates about the player's forward). See mDomeLock* in the header.
 	float lockYawOffset = 0.f;
 	if (r_cubemap_dome_lock_yaw && mDomeLockValid)
 		lockYawOffset = (float)(mCurViewYaw - mDomeLockYaw);
@@ -631,9 +671,18 @@ void CubemapRenderer::CompositeAndStream()
 		// Warp the 6 faces into a square fisheye domemaster.
 		DomemasterParams dp;
 		dp.fovDeg = r_cubemap_dome_fov;
-		BuildInvRot(r_cubemap_dome_yaw + lockYawOffset,
-		            r_cubemap_dome_pitch, r_cubemap_dome_roll,
+		BuildInvRot(r_cubemap_dome_yaw, r_cubemap_dome_pitch, r_cubemap_dome_roll,
 		            true, dp.invRot);
+
+		// Rim-band azimuth, taken from the UNSPUN rotation: the dome front, where
+		// the status bar sits with no lock. Without this the shader derives the
+		// band centre from the spun matrix and the band orbits away with the
+		// weapon (r_cubemap_dome_hud_lock off keeps that behaviour). Same
+		// expression the shader uses: atan2 over row 2 of the column-major matrix.
+		dp.hudCenterFixed = r_cubemap_dome_hud_lock;
+		dp.hudCenterRad   = atan2f(dp.invRot[5], dp.invRot[2]);
+
+		SpinContentAboutUp(lockYawOffset, dp.invRot);
 		dp.flipH = r_cubemap_dome_flip_h;
 		dp.flipV = r_cubemap_dome_flip_v;
 		dp.flipUpDown = r_cubemap_dome_flip_ud;
@@ -658,9 +707,9 @@ void CubemapRenderer::CompositeAndStream()
 		// is likewise baked onto a face (see BlitMenuToFrontFace).
 		DomemasterParams ep;
 		ep.equirect = true;
-		BuildInvRot(r_cubemap_equi_yaw + lockYawOffset,
-		            r_cubemap_equi_pitch, r_cubemap_equi_roll,
+		BuildInvRot(r_cubemap_equi_yaw, r_cubemap_equi_pitch, r_cubemap_equi_roll,
 		            false, ep.invRot);
+		SpinContentAboutUp(lockYawOffset, ep.invRot);
 		ep.flipH = r_cubemap_equi_flip_h;
 		ep.flipV = r_cubemap_equi_flip_v;
 		ep.flipUpDown = r_cubemap_dome_flip_ud;

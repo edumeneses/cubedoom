@@ -571,7 +571,7 @@ layout(push_constant) uniform PC {
 	vec4 params;                     // x=halfFovRad y=flipX z=flipY w=hudEnable
 	vec4 hud;                        // x=halfArcRad y=band z=strip w=crop
 	vec4 hud2;                       // x=offsetRad y=hudFlipH z=flipUD w=hudFlipV
-	vec4 proj;                       // x=equirect(1/0)
+	vec4 proj;                       // x=equirect(1/0) y=hudCenterRad z=hudCenterFixed(1/0)
 } pc;
 #define UV(c) (((c) * vec2(1.0, 1.0) + 1.0) * 0.5)
 void main() {
@@ -621,7 +621,8 @@ void main() {
 			}
 		} else {
 			vec3 fwd = vec3(pc.rot0.z, pc.rot1.z, pc.rot2.z);
-			float center = atan(fwd.y, fwd.x) + pc.hud2.x;
+			float center = (pc.proj.z > 0.5 ? pc.proj.y : atan(fwd.y, fwd.x))
+			             + pc.hud2.x;
 			float ang = atan(p.y, p.x);
 			float dd  = mod(ang - center + 3.14159265, 6.28318531) - 3.14159265;
 			if (r >= 1.0 - band && abs(dd) <= halfArc) {
@@ -820,6 +821,8 @@ void VulkanRenderDevice::RenderDomemaster(FCanvasTexture** faces, int N,
 	push.hud2[2] = params.flipUpDown ? -1.0f : 1.0f;
 	push.hud2[3] = params.hudFlipV ? 1.0f : 0.0f;
 	push.proj[0] = params.equirect ? 1.0f : 0.0f;
+	push.proj[1] = params.hudCenterRad;
+	push.proj[2] = params.hudCenterFixed ? 1.0f : 0.0f;
 
 	RenderPassBegin()
 		.RenderPass(mDomeRenderPass.get())
