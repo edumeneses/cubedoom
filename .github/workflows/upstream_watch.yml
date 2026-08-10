@@ -31,6 +31,10 @@ jobs:
       - name: Compare and report
         env:
           GH_TOKEN: ${{ github.token }}
+          # The step above adds an `upstream` remote; gh prefers a remote named
+          # `upstream` over `origin` when guessing the base repo, which would
+          # send these issue/label calls to UZDoom/UZDoom instead of us.
+          GH_REPO: ${{ github.repository }}
         run: |
           count=$(git rev-list --count HEAD..upstream/trunk)
           echo "UZDoom trunk is $count commit(s) ahead of master"
