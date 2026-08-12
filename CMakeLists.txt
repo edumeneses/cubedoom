@@ -270,10 +270,6 @@ if (CURL_REQUIRED)
 	endif()
 endif()
 
-if (NOT FORCE_INTERNAL_CPPDAP)
-	find_package( cppdap CONFIG )
-endif()
-
 include( TargetArch )
 
 target_architecture(TARGET_ARCHITECTURE)

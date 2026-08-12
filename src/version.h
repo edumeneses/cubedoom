@@ -42,14 +42,10 @@
 #define ENG_MINOR 0
 #define ENG_REVISION 0
 
-#define RC_REVISION 999999
-
-#define CURRENT_UPDATE_CHANNEL UpdateChannel::PREVIEW
-
 // Version stored in the ini's [LastRun] section.
 // Bump it if you made some configuration change that you want to
 // be able to migrate in FGameConfigFile::DoGlobalSetup().
-#define ENGINELASTRUNVERSION "232"
+#define ENGINELASTRUNVERSION "233"
 #define GAMELASTRUNVERSION "1"
 
 // Protocol version used in demos.
@@ -102,18 +98,12 @@
 
 // DomeDoom: the updater is compiled out (USE_UPDATER forced OFF). These
 // URLs are retargeted at the DomeDoom releases so a future re-enable can
-// never fetch stock UZDoom builds over the fulldome binary.
-#define UPDATER_URL_STABLE "https://api.github.com/repos/edumeneses/domedoom/releases/latest"
-#define UPDATER_URL_STABLE_BACKUP "https://api.github.com/repos/edumeneses/domedoom/releases/latest"
-
-#define UPDATER_URL_PREVIEW "https://api.github.com/repos/edumeneses/domedoom/releases/latest"
-#define UPDATER_URL_PREVIEW_BACKUP "https://api.github.com/repos/edumeneses/domedoom/releases/latest"
-
-#define UPDATER_URL_TESTING "https://api.github.com/repos/edumeneses/domedoom/releases/latest"
-#define UPDATER_URL_TESTING_BACKUP "https://api.github.com/repos/edumeneses/domedoom/releases/latest"
-
-#define UPDATER_URL_ALL "https://api.github.com/repos/edumeneses/domedoom/releases"
-#define UPDATER_URL_ALL_BACKUP "https://api.github.com/repos/edumeneses/domedoom/releases"
+// never fetch stock UZDoom builds over the fulldome binary. Upstream
+// replaced the per-channel UPDATER_URL_* macros with these two format
+// strings; keep the placeholder counts (2 and 3) that updatebuttonbar.cpp
+// formats them with.
+#define UPDATER_URL "https://github.com/edumeneses/domedoom/releases/download/{}/{}"
+#define UPDATER_URL_BACKUP "https://github.com/edumeneses/domedoom/releases/{}/{}/{}"
 
 // For QUERYIWADDEFAULT: Set to 'true' to always show dialog box on startup by default, 'false' to disable.
 // Should set to 'false' for standalone games, and set to 'true' for regular source port forks that are meant to run any game.
@@ -136,12 +126,3 @@ const char *GetGitHash();
 const char *GetGitTime();
 const char *GetGitTag();
 int GetGitDistance();
-
-#define RC_REVISION_NOTRC 999999
-
-#ifdef __cplusplus
-
-#include <compare>
-#include <cstdint>
-
-#endif // __cplusplus
