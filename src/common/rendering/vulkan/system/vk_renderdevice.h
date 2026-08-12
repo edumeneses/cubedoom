@@ -144,6 +144,16 @@ private:
 
 	bool mVSync = false;
 
+	// Cubemap readback staging, ping-ponged so the frame never stalls on the
+	// GPU: frame N issues its copy into one buffer and reads what frame N-1
+	// wrote into the other. Persistently mapped — a 4096x4096 domemaster is
+	// 64 MB, and allocating/mapping that per frame cost more than the copy.
+	std::unique_ptr<VulkanBuffer> mCubeReadback[2];
+	uint8_t*                      mCubeReadbackMapped[2] = {};
+	bool                          mCubeReadbackFilled[2] = {};
+	size_t                        mCubeReadbackSize      = 0;
+	int                           mCubeReadbackIndex     = 0;
+
 	// Fulldome domemaster warp pass (Vulkan). Built lazily on first use.
 	bool mDomeInit = false;
 	int  mDomeFbW = 0, mDomeFbH = 0;

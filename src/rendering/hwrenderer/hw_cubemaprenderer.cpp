@@ -26,8 +26,8 @@
 #include <cstring>
 #include <cmath>
 
-// Output projection: 0 = horizontal cubemap strip (6144x1024),
-//                    1 = square fisheye domemaster (2048x2048),
+// Output projection: 0 = horizontal cubemap strip (12288x2048),
+//                    1 = square fisheye domemaster (4096x4096),
 //                    2 = equirectangular panorama (4096x2048).
 // NOTE: PipeWire init and the readback PBO size on the first frame; switching
 // this at runtime needs a restart to re-init those paths cleanly.

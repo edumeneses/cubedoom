@@ -127,7 +127,12 @@ static void NdiLibShutdown()
 
 struct NdiVideoOutput::Impl {
     NDIlib_send_instance_t sender = nullptr;
-    std::vector<uint8_t>   flipped;
+    // Two flip buffers, alternated: send_send_video_async_v2 returns before NDI
+    // is done reading the frame, and only guarantees it is finished with it once
+    // the NEXT async send returns. Writing into the buffer still in flight would
+    // tear the frame being transmitted.
+    std::vector<uint8_t>   flipped[2];
+    int                    flipIndex = 0;
 };
 
 bool NdiVideoOutput::Init(const std::string& label, int width, int height)
@@ -138,7 +143,8 @@ bool NdiVideoOutput::Init(const std::string& label, int width, int height)
         return false;
 
     auto* impl = new Impl();
-    impl->flipped.resize((size_t)width * height * 4);
+    impl->flipped[0].resize((size_t)width * height * 4);
+    impl->flipped[1].resize((size_t)width * height * 4);
 
     NDIlib_send_create_t desc;
     desc.p_ndi_name  = label.c_str();
@@ -170,11 +176,12 @@ void NdiVideoOutput::PushFrame(const uint8_t* pixels, int srcStride)
     if (!mRunning || !mImpl) return;
 
     const int rowBytes = mWidth * 4;
+    uint8_t*  dstBuf   = mImpl->flipped[mImpl->flipIndex].data();
     // Row-flip: GL bottom-up -> NDI top-down.
     for (int y = 0; y < mHeight; ++y)
     {
         const uint8_t* src = pixels + (size_t)(mHeight - 1 - y) * srcStride;
-        memcpy(mImpl->flipped.data() + (size_t)y * rowBytes, src, rowBytes);
+        memcpy(dstBuf + (size_t)y * rowBytes, src, rowBytes);
     }
 
     NDIlib_video_frame_v2_t frame;
@@ -189,12 +196,18 @@ void NdiVideoOutput::PushFrame(const uint8_t* pixels, int srcStride)
     frame.picture_aspect_ratio = 0.0f;
     frame.frame_format_type    = NDIlib_frame_format_type_progressive;
     frame.timecode             = NDIlib_send_timecode_synthesize;
-    frame.p_data               = mImpl->flipped.data();
+    frame.p_data               = dstBuf;
     frame.line_stride_in_bytes = rowBytes;
     frame.p_metadata           = nullptr;
     frame.timestamp            = 0;
 
-    gNdiLib->send_send_video_v2(mImpl->sender, &frame);
+    // Async: the blocking send copies/transmits a 64 MB domemaster frame on the
+    // render thread (~32 ms at 4096x4096, the single largest cost in the dome
+    // pipeline). The async variant hands the buffer over and returns; NDI is
+    // done with it by the time the next async send returns, hence the two
+    // alternating buffers above.
+    gNdiLib->send_send_video_async_v2(mImpl->sender, &frame);
+    mImpl->flipIndex ^= 1;
 }
 
 void NdiVideoOutput::Shutdown()
@@ -204,6 +217,8 @@ void NdiVideoOutput::Shutdown()
     {
         if (mImpl->sender)
         {
+            // Flush the in-flight async frame before the flip buffers die.
+            gNdiLib->send_send_video_async_v2(mImpl->sender, nullptr);
             gNdiLib->send_destroy(mImpl->sender);
             NdiLibShutdown();
         }

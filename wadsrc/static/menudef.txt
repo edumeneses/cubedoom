@@ -425,7 +425,7 @@ OptionMenu "FulldomeOutputOptions" protected
 	StaticText " "
 	StaticText "Projection Format", 1
 	Option "Output projection", "r_cubemap_mode", "CubemapOutputMode"
-	StaticText "Strip = 6144x1024, domemaster = 2048x2048, equirect = 4096x2048.", 1
+	StaticText "Strip = 12288x2048, domemaster = 4096x4096, equirect = 4096x2048.", 1
 	StaticText "Switching projection needs a restart (re-inits streaming buffers).", 1
 	Slider    "Domemaster FOV (degrees)", "r_cubemap_dome_fov", 120, 300, 5
 	TextField "  FOV (type value)", "r_cubemap_dome_fov"

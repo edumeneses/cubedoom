@@ -125,6 +125,17 @@ VulkanRenderDevice::~VulkanRenderDevice()
 {
 	vkDeviceWaitIdle(device->device); // make sure the GPU is no longer using any objects before RAII tears them down
 
+	// The cubemap readback buffers stay mapped for their whole lifetime; VMA
+	// wants them unmapped before the allocation goes away.
+	for (int i = 0; i < 2; i++)
+	{
+		if (mCubeReadbackMapped[i])
+		{
+			mCubeReadback[i]->Unmap();
+			mCubeReadbackMapped[i] = nullptr;
+		}
+	}
+
 	delete mVertexData;
 	delete mSkyData;
 	delete mViewpoints;
@@ -492,6 +503,48 @@ void VulkanRenderDevice::CompositeCubemapFaces(FCanvasTexture** faces, int N, FC
 
 void VulkanRenderDevice::ReadCubemapCrossPixels(FCanvasTexture* crossTex, uint8_t* buf, int w, int h)
 {
+	const size_t size = (size_t)w * h * 4;
+
+	// (Re)create the ping-pong staging buffers when the output size changes
+	// (r_cubemap_mode switch). Freeing them needs the GPU idle, so this is the
+	// one path that still stalls — it happens on a mode switch, not per frame.
+	if (mCubeReadbackSize != size)
+	{
+		if (mCubeReadback[0] || mCubeReadback[1])
+			mCommands->WaitForCommands(false);
+		for (int i = 0; i < 2; i++)
+		{
+			if (mCubeReadback[i]) mCubeReadback[i]->Unmap();
+			mCubeReadback[i].reset();
+			mCubeReadbackMapped[i] = nullptr;
+			mCubeReadbackFilled[i] = false;
+		}
+		for (int i = 0; i < 2; i++)
+		{
+			mCubeReadback[i] = BufferBuilder()
+				.Size(size)
+				.Usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU)
+				.DebugName("ReadCubemapCrossPixels")
+				.Create(device.get());
+			mCubeReadbackMapped[i] = (uint8_t*)mCubeReadback[i]->Map(0, size);
+		}
+		mCubeReadbackSize  = size;
+		mCubeReadbackIndex = 0;
+	}
+
+	const int cur  = mCubeReadbackIndex;
+	const int prev = cur ^ 1;
+
+	// Hand back the frame the GPU copied last time round. The end-of-frame
+	// fence wait in VkCommandBufferManager::WaitForCommands(true) already
+	// guarantees that copy completed, so no sync is needed here — this is what
+	// keeps the pass off the critical path. The caller absorbs the one-frame
+	// latency (it discards the very first readback).
+	if (mCubeReadbackFilled[prev])
+		memcpy(buf, mCubeReadbackMapped[prev], size);
+	else
+		memset(buf, 0, size);
+
 	auto crossHW = static_cast<VkHardwareTexture*>(crossTex->GetHardwareTexture(0, 0));
 	VkTextureImage* cross = crossHW->GetImage(crossTex, 0, 0);
 
@@ -502,12 +555,6 @@ void VulkanRenderDevice::ReadCubemapCrossPixels(FCanvasTexture* crossTex, uint8_
 		.AddImage(cross, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, false)
 		.Execute(cmd);
 
-	auto staging = BufferBuilder()
-		.Size((size_t)w * h * 4)
-		.Usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU)
-		.DebugName("ReadCubemapCrossPixels")
-		.Create(device.get());
-
 	VkBufferImageCopy region = {};
 	region.imageExtent.width = w;
 	region.imageExtent.height = h;
@@ -515,23 +562,18 @@ void VulkanRenderDevice::ReadCubemapCrossPixels(FCanvasTexture* crossTex, uint8_
 	region.imageSubresource.layerCount = 1;
 	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	cmd->copyImageToBuffer(cross->Image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	                       staging->buffer, 1, &region);
+	                       mCubeReadback[cur]->buffer, 1, &region);
 
 	// Restore the cross to its sampling layout for the next frame.
 	VkImageTransition()
 		.AddImage(cross, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false)
 		.Execute(cmd);
 
-	// Submit and wait so the staging buffer is populated. This stalls the
-	// frame (like CopyScreenToBuffer) — acceptable for the offscreen dome feed.
-	mCommands->WaitForCommands(false);
-
-	// GZDoom renders the scene bottom-up (matching the GL convention), so we
-	// preserve that order here; the transports' PushFrame() does the top-down
-	// flip. No vertical flip on this copy.
-	uint8_t* pixels = (uint8_t*)staging->Map(0, (size_t)w * h * 4);
-	memcpy(buf, pixels, (size_t)w * h * 4);
-	staging->Unmap();
+	// GZDoom renders the scene bottom-up (matching the GL convention), so the
+	// copy preserves that order; the transports' PushFrame() does the top-down
+	// flip. No vertical flip here.
+	mCubeReadbackFilled[cur] = true;
+	mCubeReadbackIndex       = prev;
 }
 
 //===========================================================================

@@ -236,7 +236,7 @@ void OpenGLFrameBuffer::RenderTextureView(FCanvasTexture* tex, std::function<voi
 // Blits 6 pre-rendered face textures into a horizontal strip inside crossTex
 // using glBlitFramebuffer (pure GPU blit, no CPU readback).
 //
-// Output layout (6144 × 1024):
+// Output layout (12288 × 2048):
 //   [RIGHT][LEFT][UP][DOWN][FRONT][BACK]
 //   col:  0     1    2    3     4     5
 //

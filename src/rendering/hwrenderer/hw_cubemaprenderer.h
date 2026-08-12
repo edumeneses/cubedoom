@@ -30,24 +30,28 @@ enum CubeFaceIndex {
 
 // Output projection, selected by r_cubemap_mode.
 enum CubemapOutputMode {
-	CUBE_OUT_STRIP = 0,   // horizontal 6-face strip (6144x1024)
-	CUBE_OUT_DOME  = 1,   // square fisheye domemaster (2048x2048)
+	CUBE_OUT_STRIP = 0,   // horizontal 6-face strip (12288x2048)
+	CUBE_OUT_DOME  = 1,   // square fisheye domemaster (4096x4096)
 	CUBE_OUT_EQUI  = 2,   // 2:1 equirectangular panorama (4096x2048)
 };
 
 class CubemapRenderer
 {
 public:
-	static constexpr int FACE_SIZE  = 1024;
+	// Face size drives the real detail in every projection: the 90°-FOV face is
+	// the source the warp passes sample. 2048 gives ~17.9 px/deg at the face
+	// centre, which fully feeds a 4096 domemaster at the default 270° dome FOV
+	// (~15.2 px/deg); 1024 left the centre of each face upscaled.
+	static constexpr int FACE_SIZE  = 2048;
 	static constexpr int CROSS_COLS = 6;
 	static constexpr int CROSS_ROWS = 1;
-	static constexpr int CROSS_W    = FACE_SIZE * CROSS_COLS; // 6144
-	static constexpr int CROSS_H    = FACE_SIZE * CROSS_ROWS; // 1024
-	static constexpr int DOME_SIZE  = 2048;                  // square domemaster
-	static constexpr int EQUI_W     = 4096;                  // equirect: 4*FACE_SIZE at the equator
-	static constexpr int EQUI_H     = 2048;                  // 2:1 panorama
-	static constexpr int HUD_W      = 2048;                  // rim-HUD source tex
-	static constexpr int HUD_H      = 2048;                  // square: avoids vertical squish
+	static constexpr int CROSS_W    = FACE_SIZE * CROSS_COLS; // 12288
+	static constexpr int CROSS_H    = FACE_SIZE * CROSS_ROWS; // 2048
+	static constexpr int DOME_SIZE  = 4096;                  // square domemaster
+	static constexpr int EQUI_W     = 4096;                  // 2:1 panorama
+	static constexpr int EQUI_H     = 2048;
+	static constexpr int HUD_W      = 4096;                  // rim-HUD source tex (matches DOME_SIZE)
+	static constexpr int HUD_H      = 4096;                  // square: avoids vertical squish
 
 	~CubemapRenderer();
 
